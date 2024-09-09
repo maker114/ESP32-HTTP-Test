@@ -8,8 +8,9 @@
 #include <DallasTemperature.h>
 #define ONE_WIRE_BUS 32
 
-void weather_update();
-int update = 0;
+// 定义子函数
+void weather_update(void);
+void Button_CallBack(void);
 
 // 定义WiFi密码及SSID
 const char *password = "00000000";
@@ -37,16 +38,21 @@ int nowtime;          // 北京时间
 // 配置RTC时钟
 ESP32Time rtc(3600 * 8); // offset in seconds GMT+8
 
-// 按键值
-int key_num = 0;
-int key_flag = 0;
-float PotValue = 0;
+// 初始化变量
+int key_num = 0;    // 按键值
+float PotValue = 0; // 电压值
+
+// 初始化标志位
+int Update_Flag = 0; // 更新标志位，为了避免在同一时间内反复触发
+int key_flag = 0;    // 按键标志位，为了避免在按键按下后被视为连按
+int mode_flag = 0;   // 模式标志位，为了在多个模式中进行切换
 
 void setup()
 {
   // 初始化IO
-  pinMode(17, INPUT_PULLUP); // 控制按键
-  pinMode(2, OUTPUT);        // 控制LED
+  pinMode(17, INPUT_PULLUP);                     // 控制按键
+  pinMode(2, OUTPUT);                            // 控制LED
+  attachInterrupt(17, Button_CallBack, FALLING); // 配置按键中断
 
   // 初始化OLED
   u8g2.begin();
@@ -127,35 +133,30 @@ void setup()
 
 void loop()
 {
-  // OLED相关
+  // OLED帧起始
   u8g2.clearBuffer();
+  // 部分一：按键检测，切换模式
+  // if (digitalRead(17) == 0)
+  //{
+  //  delay(20);
+  //  if (digitalRead(17) == 0 && key_flag == 0)
+  //  {
+  //    if (key_num == 1)
+  //      key_num = 0;
+  //    else if (key_num == 0)
+  //      key_num = 1;
+  //    key_flag = 1;
+  //  }
+  //}
+  // else if (digitalRead(17) != 0)
+  //  key_flag = 0;
 
-  // 读取按键
-  if (digitalRead(17) == 0)
-  {
-    delay(20);
-    if (digitalRead(17) == 0 && key_flag == 0)
-    {
-      if (key_num == 1)
-      {
-        key_num = 0;
-      }
-
-      else if (key_num == 0)
-      {
-        key_num = 1;
-      }
-
-      key_flag = 1;
-    }
-  }
-  else if (digitalRead(17) != 0)
-    key_flag = 0;
+  weather_update(); // 天气更新
 
   // 模式1，显示时间
-  if (key_num == 0)
+  if (mode_flag == 0)
   { /*===========================================*/
-    // 显示时间
+    // 模式一，正常时间显示界面
     /*===========================================*/
     u8g2.setFont(u8g2_font_logisoso32_tn);
     u8g2.setCursor(0, 32);
@@ -182,16 +183,10 @@ void loop()
     // AM/PM
     u8g2.setFont(u8g2_font_profont22_tr);
     u8g2.setCursor(100, 32);
-
     String nowtime = rtc.getAmPm();
     char *c = (char *)nowtime.c_str();
     u8g2.printf("%s", c);
-
     u8g2.drawHLine(0, 36, 128);
-    /*===========================================*/
-    // 中文信息显示界面
-    /*===========================================*/
-
     u8g2.setFont(u8g2_font_wqy12_t_gb2312);
     u8g2.setCursor(0, 48);
     u8g2.printf("天气： %s %d℃", weather, temperature);
@@ -213,22 +208,13 @@ void loop()
       u8g2.drawGlyph(105, 58, 0x43);
     else
       u8g2.drawGlyph(105, 58, 0x40);
-    // 发送缓冲区，刷新显存
-
-    // 电量显示
-    // PotValue = analogRead(34) * 0.001705;
-    // u8g2.setFont(u8g2_font_5x8_mr);
-    // u8g2.setCursor(95, 64);
-    // u8g2.printf("%.0f", ((PotValue - 3.2) / 0.9) * 100);
-    u8g2.sendBuffer();
-    delay(1000);
   }
 
-  // 模式二，显示天气
-  else if (key_num == 1)
+  // 模式2，显示天气
+  else if (mode_flag == 1)
   {
     /*===========================================*/
-    // 模式二
+    // 模式二，详细天气显示界面
     /*===========================================*/
     u8g2.setFont(u8g2_font_wqy12_t_gb2312);
     u8g2.setCursor(0, 12);
@@ -251,14 +237,6 @@ void loop()
       u8g2.drawGlyph(105, 25, 0x43);
     else
       u8g2.drawGlyph(105, 25, 0x40);
-    // 获取温度
-    // sensors.requestTemperatures();
-    // float tempC = sensors.getTempCByIndex(0);
-    // 判断温度
-    // if (tempC == DEVICE_DISCONNECTED_C)
-    //{
-    //  tempC = 404;
-    //}
     u8g2.setFont(u8g2_font_wqy12_t_gb2312);
     u8g2.setCursor(0, 36);
     float PotValue = analogRead(34) * 0.001705;
@@ -268,81 +246,76 @@ void loop()
     u8g2.setFont(u8g2_font_6x10_mf);
     u8g2.setCursor(0, 64);
     u8g2.printf("%s", reporttime.c_str());
-    u8g2.sendBuffer();
-    delay(1000);
   }
 
-  /*===========================================*/
-  // 每30分钟更新一次数据
-  /*===========================================*/
-  if (rtc.getMinute() % 30 == 0 && update == 0)
-  {
-    weather_update();
-    update = 1;
-  }
-  if (rtc.getMinute() % 30 != 0 && update == 1)
-  {
-    update = 0;
-  }
+  // 帧结尾，500ms刷新一次
+  u8g2.sendBuffer();
+  delay(500);
 }
-
 /**
  * @brief 联网以更新天气数据
- *
  */
-void weather_update()
-{ // OLED显示
+void weather_update(void)
+{
+  if (rtc.getMinute() % 30 == 0 && Update_Flag == 0)
+  {
+    // UI显示
+    u8g2.clearDisplay();
+    u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+    u8g2.setCursor(0, 12);
+    u8g2.printf("更新中...");
+    u8g2.sendBuffer();
 
-  u8g2.clearDisplay();
-  u8g2.setFont(u8g2_font_wqy12_t_gb2312);
-  u8g2.setCursor(0, 12);
-  u8g2.printf("更新中...");
-  u8g2.sendBuffer();
+    // 创建HTTP对象
+    HTTPClient http;
+    http.begin(url + "?city=" + "420115" + "&key=" + key); // 访问指定URL
+    int httpCode = http.GET();                             // 接受HTTP相应状态码
+    String response = http.getString();                    // 获得相应正文
+    http.end();                                            // 关闭链接
 
-  // 创建HTTP对象
-  HTTPClient http;
+    // UI显示
+    u8g2.setCursor(0, 24);
+    u8g2.printf("HTTP:%d", httpCode);
+    u8g2.sendBuffer();
 
-  // 访问指定URL
-  http.begin(url + "?city=" + "420115" + "&key=" + key);
+    // 转换JSON数据并更新
+    DynamicJsonDocument doc(1024);  // 初始化DynamicJsonDocument对象
+    deserializeJson(doc, response); // 解析JSON数据
+    temperature = doc["lives"][0]["temperature"].as<int>();
+    humidity = doc["lives"][0]["humidity"].as<int>();
+    windpower = doc["lives"][0]["windpower"].as<String>();
+    winddirection = doc["lives"][0]["winddirection"].as<String>();
+    province = doc["lives"][0]["province"].as<String>();
+    city = doc["lives"][0]["city"].as<String>();
+    weather = doc["lives"][0]["weather"].as<String>();
+    reporttime = doc["lives"][0]["reporttime"].as<String>();
 
-  // 接受HTTP相应状态码
-  int httpCode = http.GET();
-
-  u8g2.setCursor(0, 24);
-  u8g2.printf("HTTP:%d", httpCode);
-  u8g2.sendBuffer();
-
-  // 获得相应正文
-  String response = http.getString();
-  // Serial.println(response);
-
-  // 关闭链接
-  http.end();
-
-  // 初始化DynamicJsonDocument对象
-  DynamicJsonDocument doc(1024);
-
-  // 解析JSON数据
-  deserializeJson(doc, response);
-
-  // 转换JSON数据
-  temperature = doc["lives"][0]["temperature"].as<int>();
-  humidity = doc["lives"][0]["humidity"].as<int>();
-
-  windpower = doc["lives"][0]["windpower"].as<String>();
-  winddirection = doc["lives"][0]["winddirection"].as<String>();
-  province = doc["lives"][0]["province"].as<String>();
-  city = doc["lives"][0]["city"].as<String>();
-  weather = doc["lives"][0]["weather"].as<String>();
-  reporttime = doc["lives"][0]["reporttime"].as<String>();
-
-  u8g2.setCursor(0, 40);
-  u8g2.printf("更新成功！");
-  u8g2.setFont(u8g2_font_6x10_mf);
-  u8g2.setCursor(0, 64);
-  u8g2.printf("%s", reporttime.c_str());
-  u8g2.sendBuffer();
-  delay(2000);
+    // UI显示
+    u8g2.setCursor(0, 40);
+    u8g2.printf("更新成功！");
+    u8g2.setFont(u8g2_font_6x10_mf);
+    u8g2.setCursor(0, 64);
+    u8g2.printf("%s", reporttime.c_str());
+    u8g2.sendBuffer();
+    delay(2000);
+    u8g2.clearBuffer(); // 清除缓冲区避免残留影响主函数显示
+    Update_Flag = 1;
+  }
+  if (rtc.getMinute() % 30 != 0 && Update_Flag == 1)
+    Update_Flag = 0; // 避免反复触发
 }
 
-// 这是一个测试，添加了一部分内容
+void Button_CallBack(void)
+{
+  // 古法延时
+  for (uint16_t i = 0; i < 65534; i++)
+    ;
+
+  if (digitalRead(17) == LOW)
+  {
+    if (mode_flag == 1)
+      mode_flag = 0;
+    else if (mode_flag == 0)
+      mode_flag = 1;
+  }
+}
