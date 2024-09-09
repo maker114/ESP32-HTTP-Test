@@ -162,9 +162,9 @@ void setup()
   // 赋值
   nowtime = doc2["data"]["now"].as<int>();
 
-  // Serial.println(nowtime);
   //  初始化RTC时钟
   rtc.setTime(nowtime);
+  Serial.println("Hello World!\r\n");
 }
 
 void loop()
@@ -230,9 +230,6 @@ void loop()
     u8g2.printf("%s", c);
 
     u8g2.drawHLine(0, 36, 128);
-
-    Serial.printf("second:%d\r\n", rtc.getSecond());
-
     /*===========================================*/
     // 中文信息显示界面
     /*===========================================*/
@@ -265,7 +262,7 @@ void loop()
     // u8g2.setFont(u8g2_font_5x8_mr);
     // u8g2.setCursor(95, 64);
     // u8g2.printf("%.0f", ((PotValue - 3.2) / 0.9) * 100);
-    // u8g2.sendBuffer();
+    u8g2.sendBuffer();
     delay(1000);
   }
 
