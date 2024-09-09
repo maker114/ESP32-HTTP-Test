@@ -8,21 +8,12 @@
 #include <DallasTemperature.h>
 #define ONE_WIRE_BUS 32
 
-// 初始化单总线通讯
-// OneWire oneWire(ONE_WIRE_BUS);
-
-// 配置温度传感器
-// DallasTemperature sensors(&oneWire);
-
 void weather_update();
 int update = 0;
-// 定义WiFi密码及SSID
 
+// 定义WiFi密码及SSID
 const char *password = "00000000";
 const char *ssid = "sun";
-
-// const char *ssid = "TP-LINK_6B14";
-// const char *password = "423 family we are";
 
 String url = "https://restapi.amap.com/v3/weather/weatherInfo";
 String url2 = "https://api.bilibili.com/x/report/click/now";
@@ -33,45 +24,37 @@ String key = "e2cdd38696d47e8da458493bef49a838";
 U8G2_SH1106_128X64_NONAME_F_4W_HW_SPI u8g2(U8G2_R0, /* cs=*/14, /* dc=*/12, /* reset=*/13); // scl：io18  sda：io23
 
 // 定义JSON解析得到的变量
-int temperature = 0; // 温度
-int humidity = 0;    // 湿度
-
+int temperature = 0;  // 温度
+int humidity = 0;     // 湿度
 String windpower;     // 风力
 String province;      // 省份
 String city;          // 城市
 String weather;       // 天气
 String winddirection; // 风向
 String reporttime;    // 时间
-
-int nowtime; // 北京时间
+int nowtime;          // 北京时间
 
 // 配置RTC时钟
 ESP32Time rtc(3600 * 8); // offset in seconds GMT+8
 
 // 按键值
-
 int key_num = 0;
 int key_flag = 0;
-
 float PotValue = 0;
 
 void setup()
 {
-  // 初始化按键
-  pinMode(17, INPUT_PULLUP);
-  // 初始化传感器
-  // sensors.begin();
-  // 初始化串口
-  Serial.begin(9600);
+  // 初始化IO
+  pinMode(17, INPUT_PULLUP); // 控制按键
+  pinMode(2, OUTPUT);        // 控制LED
+
   // 初始化OLED
   u8g2.begin();
-  // 开启中文字符支持
-  u8g2.enableUTF8Print();
-  // 设置字体
-  u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+  u8g2.enableUTF8Print();                 // 开启中文字符支持
+  u8g2.setFont(u8g2_font_wqy12_t_gb2312); // 设置字体
 
-  // 初始化串口屏
-  // Serial.begin(9600);
+  // 初始化串口
+  Serial.begin(9600);
   Serial.println("Hello World!\r\n");
 
   // 显示连接UI
@@ -83,57 +66,48 @@ void setup()
   u8g2.printf("连接中");
   u8g2.sendBuffer();
 
-  /***********WIFI初始化部分***********/
+  // 初始化WIFI
   WiFi.begin(ssid, password);
-  pinMode(2, OUTPUT); // 控制LED
   while (WiFi.status() != WL_CONNECTED)
   {
     u8g2.printf(".");
     digitalWrite(2, HIGH);
     delay(200);
-    digitalWrite(2, LOW);
+    digitalWrite(2, LOW); // 闪烁表示正在连接
     delay(200);
     u8g2.sendBuffer();
-  } // 闪烁表示正在连接
-  digitalWrite(2, LOW); // 熄灭表示连接成功
-  // U8G2显示连接成功
-  u8g2.setCursor(0, 48);
-  u8g2.printf("连接成功");
+  }
+  digitalWrite(2, LOW);  // 熄灭表示连接成功
+  u8g2.setCursor(0, 48); // U8G2显示连接成功
+  u8g2.printf("网络连接成功");
+  u8g2.setCursor(0, 60); // 显示获取状态
+  u8g2.printf("联网获取数据中...");
   u8g2.sendBuffer();
 
-  // 创建HTTP对象
-  HTTPClient http;
+  // 初始化HTTP连接，联网以获取JSON文件
+  HTTPClient http;                                    // 创建HTTP对象
+  http.begin(url + "?city=" + citys + "&key=" + key); // 访问指定URl获取天气信息
+  int httpCode1 = http.GET();                         // 接受HTTP相应状态码
+  String response = http.getString();                 // 获取天气正文
+  http.end();                                         // 结束HTTP连接
 
-  // 访问指定URL
-  http.begin(url + "?city=" + citys + "&key=" + key);
+  http.begin(url2);                    // 访问指定URl获取时间信息（感谢阿b的API）
+  int httpCode2 = http.GET();          // 接受HTTP相应状态码
+  String response2 = http.getString(); // 获取时间正文
+  http.end();                          // 结束HTTP连接
 
-  // 接受HTTP相应状态码
-  int httpCode = http.GET();
-
-  // OLED显示
-  u8g2.setCursor(0, 60);
-  u8g2.printf("HTTP状态码: %d", httpCode);
+  u8g2.setCursor(0, 60); // 显示获取状态
+  if (httpCode1 == 200 && httpCode2 == 200)
+    u8g2.printf("时间与天气获取成功");
+  else
+    u8g2.printf("HTTP获取失败");
   u8g2.sendBuffer();
 
-  Serial.printf("Status code=%d", httpCode);
-
-  // 获得相应正文
-  String response = http.getString();
-  // Serial.println(response);
-
-  // 关闭链接
-  http.end();
-
-  // 初始化DynamicJsonDocument对象
-  DynamicJsonDocument doc(1024);
-
-  // 解析JSON数据
-  deserializeJson(doc, response);
-
-  // 转换JSON数据
+  // 解析并转换JSON天气数据
+  DynamicJsonDocument doc(1024);  // 初始化DynamicJsonDocument对象
+  deserializeJson(doc, response); // 解析JSON数据，获取实时天气
   temperature = doc["lives"][0]["temperature"].as<int>();
   humidity = doc["lives"][0]["humidity"].as<int>();
-
   windpower = doc["lives"][0]["windpower"].as<String>();
   winddirection = doc["lives"][0]["winddirection"].as<String>();
   province = doc["lives"][0]["province"].as<String>();
@@ -141,30 +115,14 @@ void setup()
   weather = doc["lives"][0]["weather"].as<String>();
   reporttime = doc["lives"][0]["reporttime"].as<String>();
 
-  // 获取实时时间
-  http.begin(url2);
-  int httpCode2 = http.GET();
-  String response2 = http.getString();
+  // 解析并转换JSON时间数据
+  DynamicJsonDocument doc2(1024);          // 初始化DynamicJsonDocument对象
+  deserializeJson(doc2, response2);        // 解析JSON数据，获取时间
+  nowtime = doc2["data"]["now"].as<int>(); // 赋值
 
-  // 获得相应正文
-  // Serial.println(httpCode2);
-  // Serial.println(response2);
-
-  // 关闭链接
-  http.end();
-
-  // 初始化DynamicJsonDocument对象
-  DynamicJsonDocument doc2(1024);
-
-  // 解析JSON数据
-  deserializeJson(doc2, response2);
-
-  // 赋值
-  nowtime = doc2["data"]["now"].as<int>();
-
-  //  初始化RTC时钟
+  // 初始化RTC时钟
   rtc.setTime(nowtime);
-  Serial.println("Hello World!\r\n");
+  delay(2000);
 }
 
 void loop()
