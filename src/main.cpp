@@ -51,9 +51,10 @@ uint16_t Time_count = 0;    // 时间计数
 String response, response2; // HTTP响应
 
 // 初始化标志位
-int Update_Flag = 0; // 更新标志位，为了避免在同一时间内反复触发
-int Button_Flag = 0; // 按键标志位，为了避免在按键按下后被视为连按
-int mode_flag = 0;   // 模式标志位，为了在多个模式中进行切换
+int Update_Flag = 0;     // 更新标志位，为了避免在同一时间内反复触发
+int Button_Flag = 0;     // 按键标志位，为了避免在按键按下后被视为连按
+int mode_flag = 0;       // 模式标志位，为了在多个模式中进行切换
+int LastSecond_Flag = 0; // 秒标志位，为了与RTC时间相对应
 void setup()
 {
   // 初始化IO
@@ -138,6 +139,8 @@ void setup()
   // 初始化RTC时钟
   rtc.setTime(nowtime);
   delay(2000);
+  WiFi.disconnect(true, false);
+  WiFi.mode(WIFI_OFF);
 }
 
 void loop()
@@ -147,8 +150,9 @@ void loop()
   weather_update(); // 天气更新
   Button_Scan();    // 按键扫描
 
-  if (Time_count % 100 == 0) // 1s刷新一次
+  if (rtc.getSecond() != LastSecond_Flag) // 1s刷新一次
   {
+    LastSecond_Flag = rtc.getSecond(); // 更新秒标志位,只刷新一次
     u8g2.clearBuffer();
     switch (mode_flag)
     {
@@ -164,7 +168,6 @@ void loop()
     default:
       break;
     }
-    Time_count = 0; // 作为循环中时间最长的进程，执行完之后就清除计数值
   }
   if (rtc.getSecond() % 20 == 0 && mode_flag == 2) // 60s刷新一次
   {
@@ -172,7 +175,6 @@ void loop()
     Display_Mode3();
   }
   // 计数装置
-  Time_count++;
   delay(10);
 }
 
@@ -287,62 +289,58 @@ void Display_Mode3(void)
   /*===========================================*/
   // 模式三，简单时钟界面
   /*===========================================*/
-  do
-  {
-    u8g2.clearBuffer(); // 清空缓冲区
-    NUM_Display(rtc.getHour() / 10, 25, 20, change_H1, 12, 15);
-    NUM_Display(rtc.getHour() % 10, 25 + 15, 20, change_H2, 12, 15);
-
-    u8g2.drawVLine(60, 25, 5);
-    u8g2.drawVLine(60, 40, 5);
-
-    NUM_Display(rtc.getMinute() / 10, 65, 20, change_M1, 12, 15);
-    NUM_Display(rtc.getMinute() % 10, 65 + 15, 20, change_M2, 12, 15);
-
-    // NUM_Display(rtc.getSecond() / 10, 90, 20, change_S1, 5, 8);
-    // NUM_Display(rtc.getSecond() % 10, 90 + 8, 20, change_S2, 5, 8);
-
-    u8g2.sendBuffer(); // 发送缓冲区数据
-  } while (change_H1[7] < 15 && change_H2[7] < 15 && change_M1[7] < 15 && change_M2[7] < 15);
-  change_H1[7] = 0;
-  change_H2[7] = 0;
-  change_M1[7] = 0;
-  change_M2[7] = 0;
-  change_S1[7] = 0;
-  change_S2[7] = 0;
+  u8g2.clearBuffer(); // 清空缓冲区
+  u8g2.setFont(u8g2_font_maniac_tn);
+  u8g2.setCursor(30, 42);
+  // 小时
+  if (rtc.getHour(true) < 10)
+    u8g2.printf("0%d", rtc.getHour(true));
+  else
+    u8g2.printf("%d", rtc.getHour(true));
+  // 分隔
+  u8g2.printf(":");
+  // 分钟
+  if (rtc.getMinute() < 10)
+    u8g2.printf("0%d", rtc.getMinute());
+  else
+    u8g2.printf("%d", rtc.getMinute());
+  u8g2.sendBuffer(); // 发送缓冲区数据
 }
 
+int Refresh_Time = 0;
 void Display_Mode4(void)
 {
   /*===========================================*/
   // 模式四，带有秒针简单时钟界面
   /*===========================================*/
+  int Hour = rtc.getHour(true);
+  int Minute = rtc.getMinute();
+  int Second = rtc.getSecond();
   do
   {
     u8g2.clearBuffer(); // 清空缓冲区
-    NUM_Display(rtc.getHour() / 10, 14, 20, change_H1, 12, 15);
-    NUM_Display(rtc.getHour() % 10, 14 + 15, 20, change_H2, 12, 15);
+
+    NUM_Display(Hour / 10, 14, 20, change_H1, 10, 15);
+    NUM_Display(Hour % 10, 14 + 15, 20, change_H2, 10, 15);
 
     u8g2.drawVLine(46, 25, 5);
     u8g2.drawVLine(46, 40, 5);
 
-    NUM_Display(rtc.getMinute() / 10, 51, 20, change_M1, 12, 15);
-    NUM_Display(rtc.getMinute() % 10, 51 + 15, 20, change_M2, 12, 15);
+    NUM_Display(Minute / 10, 51, 20, change_M1, 10, 15);
+    NUM_Display(Minute % 10, 51 + 15, 20, change_M2, 10, 15);
 
     u8g2.drawVLine(83, 25, 5);
     u8g2.drawVLine(83, 40, 5);
 
-    NUM_Display(rtc.getSecond() / 10, 88, 20, change_S1, 12, 15);
-    NUM_Display(rtc.getSecond() % 10, 88 + 15, 20, change_S2, 12, 15);
+    NUM_Display(Second / 10, 88, 20, change_S1, 10, 15);
+    NUM_Display(Second % 10, 88 + 15, 20, change_S2, 10, 15);
 
     u8g2.sendBuffer(); // 发送缓冲区数据
-  } while (change_H1[7] < 15 || change_H2[7] < 15 || change_M1[7] < 15 || change_M2[7] < 15 || change_S1[7] < 15 || change_S2[7] < 15);
-  change_H1[7] = 0;
-  change_H2[7] = 0;
-  change_M1[7] = 0;
-  change_M2[7] = 0;
-  change_S1[7] = 0;
-  change_S2[7] = 0;
+
+    delay(12);
+    Refresh_Time++;
+  } while (Refresh_Time < 15); // 强制刷新15次，避免出现卡顿现象
+  Refresh_Time = 0;
 }
 
 /**
@@ -352,6 +350,16 @@ void weather_update(void)
 {
   if (rtc.getMinute() % 30 == 0 && Update_Flag == 0)
   {
+    // 重新连接WIFI
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+      digitalWrite(2, HIGH);
+      delay(500);
+      digitalWrite(2, LOW); // 闪烁表示正在连接
+      delay(500);
+    }
+    digitalWrite(2, LOW); // 熄灭表示连接成功
     // UI显示
     u8g2.clearDisplay();
     u8g2.setFont(u8g2_font_wqy12_t_gb2312);
@@ -365,6 +373,10 @@ void weather_update(void)
     int httpCode = http.GET();                             // 接受HTTP相应状态码
     String response = http.getString();                    // 获得相应正文
     http.end();                                            // 关闭链接
+
+    // 关闭WIFI省电
+    WiFi.disconnect(true, false);
+    WiFi.mode(WIFI_OFF);
 
     // UI显示
     u8g2.setCursor(0, 24);
@@ -464,7 +476,7 @@ void HTTP_LinkError_Handle(void)
     u8g2.printf("HTTPCode2=%d", httpCode2);
     u8g2.sendBuffer();
     delay(100);
-  } while (httpCode1 != 200 && httpCode2 != 200);
+  } while (httpCode1 != 200 || httpCode2 != 200);
   u8g2.setCursor(0, 48);
   u8g2.printf("重新获取成功！");
   u8g2.sendBuffer();
@@ -603,11 +615,11 @@ void NUM_Display(int num, int x, int y, float change[], int W, int H)
   Move_Cursor(H, &change[7]); // 计数用
 
   u8g2.drawHLine(x + 1, y, change[0]);             // 上横线
-  u8g2.drawHLine(x, y + H, change[1]);             // 中横线
+  u8g2.drawHLine(x + 1, y + H, change[1]);         // 中横线
   u8g2.drawHLine(x + 1, y + 2 * H - 1, change[2]); // 下横线
 
-  u8g2.drawVLine(x, y, change[3]);         // 左上竖线
+  u8g2.drawVLine(x + 1, y, change[3]);     // 左上竖线
   u8g2.drawVLine(x + W, y + 1, change[4]); // 右上竖线
-  u8g2.drawVLine(x, y + H, change[5]);     // 左下竖线
+  u8g2.drawVLine(x + 1, y + H, change[5]); // 左下竖线
   u8g2.drawVLine(x + W, y + H, change[6]); // 右下竖线
 }
