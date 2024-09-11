@@ -9,11 +9,14 @@
 
 // 定义子函数
 void weather_update(void);
-void Button_CallBack(void);
 void Display_Mode1(void);
 void Display_Mode2(void);
+void Display_Mode3(void);
+void Display_Mode4(void);
 void Button_Scan(void);
 void HTTP_LinkError_Handle(void);
+void Move_Cursor(int GoalValue, float *CurrentValue);
+void NUM_Display(int num, int x, int y, float change[], int W, int H);
 
 // 定义WiFi密码及SSID
 const char *password = "00000000";
@@ -147,17 +150,27 @@ void loop()
   if (Time_count % 100 == 0) // 1s刷新一次
   {
     u8g2.clearBuffer();
-    if (mode_flag == 0) // 模式1，显示时间
+    switch (mode_flag)
     {
+    case 0:
       Display_Mode1();
-    }
-    else if (mode_flag == 1) // 模式2，显示天气
-    {
+      break;
+    case 1:
       Display_Mode2();
+      break;
+    case 3:
+      Display_Mode4();
+      break;
+    default:
+      break;
     }
     Time_count = 0; // 作为循环中时间最长的进程，执行完之后就清除计数值
   }
-
+  if (rtc.getSecond() % 20 == 0 && mode_flag == 2) // 60s刷新一次
+  {
+    u8g2.clearBuffer();
+    Display_Mode3();
+  }
   // 计数装置
   Time_count++;
   delay(10);
@@ -259,6 +272,79 @@ void Display_Mode2(void)
   u8g2.sendBuffer();
 }
 
+float change_H1[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+float change_H2[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+float change_M1[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+float change_M2[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+float change_S1[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+float change_S2[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+int num1 = 0, num2 = 0;
+void Display_Mode3(void)
+{
+  /*===========================================*/
+  // 模式三，简单时钟界面
+  /*===========================================*/
+  do
+  {
+    u8g2.clearBuffer(); // 清空缓冲区
+    NUM_Display(rtc.getHour() / 10, 25, 20, change_H1, 12, 15);
+    NUM_Display(rtc.getHour() % 10, 25 + 15, 20, change_H2, 12, 15);
+
+    u8g2.drawVLine(60, 25, 5);
+    u8g2.drawVLine(60, 40, 5);
+
+    NUM_Display(rtc.getMinute() / 10, 65, 20, change_M1, 12, 15);
+    NUM_Display(rtc.getMinute() % 10, 65 + 15, 20, change_M2, 12, 15);
+
+    // NUM_Display(rtc.getSecond() / 10, 90, 20, change_S1, 5, 8);
+    // NUM_Display(rtc.getSecond() % 10, 90 + 8, 20, change_S2, 5, 8);
+
+    u8g2.sendBuffer(); // 发送缓冲区数据
+  } while (change_H1[7] < 15 && change_H2[7] < 15 && change_M1[7] < 15 && change_M2[7] < 15);
+  change_H1[7] = 0;
+  change_H2[7] = 0;
+  change_M1[7] = 0;
+  change_M2[7] = 0;
+  change_S1[7] = 0;
+  change_S2[7] = 0;
+}
+
+void Display_Mode4(void)
+{
+  /*===========================================*/
+  // 模式四，带有秒针简单时钟界面
+  /*===========================================*/
+  do
+  {
+    u8g2.clearBuffer(); // 清空缓冲区
+    NUM_Display(rtc.getHour() / 10, 14, 20, change_H1, 12, 15);
+    NUM_Display(rtc.getHour() % 10, 14 + 15, 20, change_H2, 12, 15);
+
+    u8g2.drawVLine(46, 25, 5);
+    u8g2.drawVLine(46, 40, 5);
+
+    NUM_Display(rtc.getMinute() / 10, 51, 20, change_M1, 12, 15);
+    NUM_Display(rtc.getMinute() % 10, 51 + 15, 20, change_M2, 12, 15);
+
+    u8g2.drawVLine(83, 25, 5);
+    u8g2.drawVLine(83, 40, 5);
+
+    NUM_Display(rtc.getSecond() / 10, 88, 20, change_S1, 12, 15);
+    NUM_Display(rtc.getSecond() % 10, 88 + 15, 20, change_S2, 12, 15);
+
+    u8g2.sendBuffer(); // 发送缓冲区数据
+  } while (change_H1[7] < 15 || change_H2[7] < 15 || change_M1[7] < 15 || change_M2[7] < 15 || change_S1[7] < 15 || change_S2[7] < 15);
+  change_H1[7] = 0;
+  change_H2[7] = 0;
+  change_M1[7] = 0;
+  change_M2[7] = 0;
+  change_S1[7] = 0;
+  change_S2[7] = 0;
+}
+
 /**
  * @brief 联网以更新天气数据
  */
@@ -320,15 +406,25 @@ void Button_Scan(void)
     if (digitalRead(17 == LOW) && Button_Flag == 0)
     {
       u8g2.clearBuffer();
-      if (mode_flag == 1)
-      {
-        mode_flag = 0;
-        Display_Mode1();
-      }
-      else if (mode_flag == 0)
+      if (mode_flag == 0)
       {
         mode_flag = 1;
         Display_Mode2();
+      }
+      else if (mode_flag == 1)
+      {
+        mode_flag = 2;
+        Display_Mode3();
+      }
+      else if (mode_flag == 2)
+      {
+        mode_flag = 3;
+        Display_Mode4();
+      }
+      else if (mode_flag == 3)
+      {
+        mode_flag = 0;
+        Display_Mode1();
       }
       Button_Flag = 1; // 标志等于1表示被按下
     }
@@ -373,4 +469,145 @@ void HTTP_LinkError_Handle(void)
   u8g2.printf("重新获取成功！");
   u8g2.sendBuffer();
   delay(1000);
+}
+
+void Move_Cursor(int GoalValue, float *CurrentValue)
+{
+  float Error = GoalValue - *CurrentValue; // 误差等于目标值减去实际值
+  if (fabs(Error) > 1)                     // 误差大于1
+  {
+    *CurrentValue += Error / 4; // 实际值加上误差除以10
+  }
+  else
+    *CurrentValue = GoalValue; // 误差小于1 直接等于目标值
+  // delay(1);
+}
+
+void NUM_Display(int num, int x, int y, float change[], int W, int H)
+{
+  int Goal_Value[7] = {0, 0, 0, 0, 0, 0, 0}; // 目标数组
+  switch (num)
+  {
+  case 0:
+    Goal_Value[0] = W;
+    Goal_Value[1] = 0;
+    Goal_Value[2] = W;
+    Goal_Value[3] = H;
+    Goal_Value[4] = H;
+    Goal_Value[5] = H;
+    Goal_Value[6] = H;
+    break;
+
+  case 1:
+    Goal_Value[0] = 0;
+    Goal_Value[1] = 0;
+    Goal_Value[2] = 0;
+    Goal_Value[3] = 0;
+    Goal_Value[4] = H;
+    Goal_Value[5] = 0;
+    Goal_Value[6] = H;
+    break;
+
+  case 2:
+    Goal_Value[0] = W;
+    Goal_Value[1] = W;
+    Goal_Value[2] = W;
+    Goal_Value[3] = 0;
+    Goal_Value[4] = H;
+    Goal_Value[5] = H;
+    Goal_Value[6] = 0;
+    break;
+
+  case 3:
+    Goal_Value[0] = W;
+    Goal_Value[1] = W;
+    Goal_Value[2] = W;
+    Goal_Value[3] = 0;
+    Goal_Value[4] = H;
+    Goal_Value[5] = 0;
+    Goal_Value[6] = H;
+    break;
+
+  case 4:
+    Goal_Value[0] = 0;
+    Goal_Value[1] = W;
+    Goal_Value[2] = 0;
+    Goal_Value[3] = H;
+    Goal_Value[4] = H;
+    Goal_Value[5] = 0;
+    Goal_Value[6] = H;
+    break;
+
+  case 5:
+    Goal_Value[0] = W;
+    Goal_Value[1] = W;
+    Goal_Value[2] = W;
+    Goal_Value[3] = H;
+    Goal_Value[4] = 0;
+    Goal_Value[5] = 0;
+    Goal_Value[6] = H;
+    break;
+
+  case 6:
+    Goal_Value[0] = W;
+    Goal_Value[1] = W;
+    Goal_Value[2] = W;
+    Goal_Value[3] = H;
+    Goal_Value[4] = 0;
+    Goal_Value[5] = H;
+    Goal_Value[6] = H;
+    break;
+
+  case 7:
+    Goal_Value[0] = W;
+    Goal_Value[1] = 0;
+    Goal_Value[2] = 0;
+    Goal_Value[3] = 0;
+    Goal_Value[4] = H;
+    Goal_Value[5] = 0;
+    Goal_Value[6] = H;
+    break;
+
+  case 8:
+    Goal_Value[0] = W;
+    Goal_Value[1] = W;
+    Goal_Value[2] = W;
+    Goal_Value[3] = H;
+    Goal_Value[4] = H;
+    Goal_Value[5] = H;
+    Goal_Value[6] = H;
+    break;
+
+  case 9:
+    Goal_Value[0] = W;
+    Goal_Value[1] = W;
+    Goal_Value[2] = W;
+    Goal_Value[3] = H;
+    Goal_Value[4] = H;
+    Goal_Value[5] = 0;
+    Goal_Value[6] = H;
+    break;
+
+  default:
+    break;
+  }
+
+  Move_Cursor(Goal_Value[0], &change[0]);
+  Move_Cursor(Goal_Value[1], &change[1]);
+  Move_Cursor(Goal_Value[2], &change[2]);
+  Move_Cursor(Goal_Value[3], &change[3]);
+  Move_Cursor(Goal_Value[4], &change[4]);
+  Move_Cursor(Goal_Value[5], &change[5]);
+  Move_Cursor(Goal_Value[6], &change[6]);
+
+  Move_Cursor(H, &change[7]); // 计数用
+
+  u8g2.drawHLine(x + 1, y, change[0]);             // 上横线
+  u8g2.drawHLine(x, y + H, change[1]);             // 中横线
+  u8g2.drawHLine(x + 1, y + 2 * H - 1, change[2]); // 下横线
+
+  u8g2.drawVLine(x, y, change[3]);         // 左上竖线
+  u8g2.drawVLine(x + W, y + 1, change[4]); // 右上竖线
+  u8g2.drawVLine(x, y + H, change[5]);     // 左下竖线
+  u8g2.drawVLine(x + W, y + H, change[6]); // 右下竖线
 }

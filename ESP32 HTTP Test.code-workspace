@@ -3,6 +3,10 @@
 		{
 			"name": "ESP32 HTTP Test",
 			"path": "."
+		},
+		{
+			"name": "Small ESP clock",
+			"path": "../Small ESP clock"
 		}
 	],
 	"settings": {
