@@ -198,8 +198,9 @@ void Display_Mode1(void)
     u8g2.drawGlyph(105, 58, 0x40);
   else if (weather == "小雨" || weather == "中雨" || weather == "大雨" || weather == "暴雨" || weather == "雨" || weather == "阵雨")
     u8g2.drawGlyph(105, 58, 0x43);
-  else
-    u8g2.drawGlyph(105, 58, 0x40);
+  // 未知的天气将不会显示图标
+  // else
+  //   u8g2.drawGlyph(105, 58, 0x40);
   u8g2.sendBuffer();
 }
 
@@ -227,8 +228,9 @@ void Display_Mode2(void)
     u8g2.drawGlyph(105, 25, 0x40);
   else if (weather == "小雨" || weather == "中雨" || weather == "大雨" || weather == "暴雨" || weather == "雨" || weather == "阵雨")
     u8g2.drawGlyph(105, 25, 0x43);
-  else
-    u8g2.drawGlyph(105, 25, 0x40);
+  // 未知的天气将不会显示图标
+  // else
+  //   u8g2.drawGlyph(105, 58, 0x40);
   u8g2.setFont(u8g2_font_wqy12_t_gb2312);
   u8g2.setCursor(0, 36);
   float PotValue = analogRead(34) * 0.001705;
@@ -305,7 +307,7 @@ void Display_Mode4(void)
 
     u8g2.sendBuffer(); // 发送缓冲区数据
 
-    delay(12);
+    delay(15);
     Refresh_Time++;
   } while (Refresh_Time < 15); // 强制刷新15次，避免出现卡顿现象
   Refresh_Time = 0;
@@ -520,7 +522,7 @@ void NUM_Display(int num, int x, int y, float change[], int W, int H)
   u8g2.drawHLine(x + 1, y + 2 * H - 1, change[2]); // 下横线
 
   u8g2.drawVLine(x + 1, y, change[3]);     // 左上竖线
-  u8g2.drawVLine(x + W, y + 1, change[4]); // 右上竖线
+  u8g2.drawVLine(x + W, y, change[4]);     // 右上竖线
   u8g2.drawVLine(x + 1, y + H, change[5]); // 左下竖线
   u8g2.drawVLine(x + W, y + H, change[6]); // 右下竖线
 }
@@ -572,9 +574,9 @@ void WIFI_Connect(void)
       u8g2.setCursor(0, 12);
       u8g2.printf("连接中...");
       u8g2.setCursor(0, 24);
-      u8g2.printf("SSID%d:%s", WIFI_Connect_ID + 1, MY_WIFI[WIFI_Connect_ID].ssid);
+      u8g2.printf("SSID%d: %s", WIFI_Connect_ID + 1, MY_WIFI[WIFI_Connect_ID].ssid);
       u8g2.setCursor(0, 36);
-      u8g2.printf("密码%d:%s", WIFI_Connect_ID + 1, MY_WIFI[WIFI_Connect_ID].password);
+      u8g2.printf("密码%d: %s", WIFI_Connect_ID + 1, MY_WIFI[WIFI_Connect_ID].password);
       if (WiFi.status() != WL_CONNECTED)
       {
         digitalWrite(2, HIGH);
@@ -606,20 +608,44 @@ void WIFI_Connect(void)
 /**
  * @brief 联网以更新天气数据
  */
+#define Interval 30 // 更新间隔（min）
 void weather_update(void)
 {
-
-  if (rtc.getMinute() % 30 == 0 && Update_Flag == 0)
+  int Link_Time = 0; // 连接次数
+  if (rtc.getMinute() % Interval == 0 && Update_Flag == 0)
   {
+    // 将之前的天气信息更新为“过时的”
+    temperature = 0;
+    humidity = 0;
+    windpower = "Dated";
+    winddirection = "Dated";
+    province = "Dated";
+    city = "Dated";
+    weather = "Dated";
+    reporttime = "Dated";
+    // 如果是模式3与4则不需要更新天气，直接返回
+    if (mode_flag == 3 || mode_flag == 4)
+      return;
     // 重新连接WIFI
     Save_ID = EEPROM.read(5);
     WiFi.begin(MY_WIFI[Save_ID].ssid, MY_WIFI[Save_ID].password);
+    // 开始尝试连接WIFI
     while (WiFi.status() != WL_CONNECTED)
     {
       digitalWrite(2, HIGH);
       delay(500);
       digitalWrite(2, LOW); // 闪烁表示正在连接
       delay(500);
+      // 当长时间未能连接上WiFi时，自动停止更新并切换到更加省电的模式4
+      if (Link_Time >= 10)
+      {
+        mode_flag = 3;
+        Update_Flag = 1;
+        Link_Time = 0;
+        Display_Mode4();
+        return;
+      }
+      Link_Time++;
     }
     digitalWrite(2, LOW); // 熄灭表示连接成功
     // UI显示
@@ -668,6 +694,6 @@ void weather_update(void)
     u8g2.clearBuffer(); // 清除缓冲区避免残留影响主函数显示
     Update_Flag = 1;
   }
-  if (rtc.getMinute() % 30 != 0 && Update_Flag == 1)
+  if (rtc.getMinute() % Interval != 0 && Update_Flag == 1)
     Update_Flag = 0; // 避免反复触发
 }
