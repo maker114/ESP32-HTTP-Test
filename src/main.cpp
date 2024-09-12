@@ -5,22 +5,8 @@
 #include <ArduinoJson.h>
 #include <ESP32Time.h>
 #include <DallasTemperature.h>
-#define ONE_WIRE_BUS 32
-
-// 定义子函数
-void weather_update(void);
-void Display_Mode1(void);
-void Display_Mode2(void);
-void Display_Mode3(void);
-void Display_Mode4(void);
-void Button_Scan(void);
-void HTTP_LinkError_Handle(void);
-void Move_Cursor(int GoalValue, float *CurrentValue);
-void NUM_Display(int num, int x, int y, float change[], int W, int H);
-
-// 定义WiFi密码及SSID
-const char *password = "00000000";
-const char *ssid = "sun";
+#include <main.h>
+#include <EEPROM.h>
 
 String url = "https://restapi.amap.com/v3/weather/weatherInfo";
 String url2 = "https://api.bilibili.com/x/report/click/now";
@@ -65,37 +51,18 @@ void setup()
   u8g2.begin();
   u8g2.enableUTF8Print();                 // 开启中文字符支持
   u8g2.setFont(u8g2_font_wqy12_t_gb2312); // 设置字体
+  u8g2.setCursor(0, 12);
+  u8g2.printf("连接中...");
+  u8g2.sendBuffer();
 
   // 初始化串口
   // Serial.begin(9600);
   // Serial.println("Hello World!\r\n");
 
-  // 显示连接UI
-  u8g2.setCursor(0, 12);
-  u8g2.printf("SSID:  %s", ssid);
-  u8g2.setCursor(0, 24);
-  u8g2.printf("密码:  %s", password);
-  u8g2.setCursor(0, 36);
-  u8g2.printf("连接中");
-  u8g2.sendBuffer();
+  // 初始化内部EEPROM
+  EEPROM.begin(12);
 
-  // 初始化WIFI
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    u8g2.printf(".");
-    digitalWrite(2, HIGH);
-    delay(200);
-    digitalWrite(2, LOW); // 闪烁表示正在连接
-    delay(200);
-    u8g2.sendBuffer();
-  }
-  digitalWrite(2, LOW);  // 熄灭表示连接成功
-  u8g2.setCursor(0, 48); // U8G2显示连接成功
-  u8g2.printf("网络连接成功");
-  u8g2.setCursor(0, 60); // 显示获取状态
-  u8g2.printf("联网获取数据中...");
-  u8g2.sendBuffer();
+  WIFI_Connect(); // 连接WiFi
 
   // 初始化HTTP连接，联网以获取JSON文件
   HTTPClient http;                                    // 创建HTTP对象
@@ -283,7 +250,8 @@ float change_M2[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 float change_S1[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 float change_S2[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
-int num1 = 0, num2 = 0;
+int num1 = 0;
+int num2 = 0;
 void Display_Mode3(void)
 {
   /*===========================================*/
@@ -341,73 +309,6 @@ void Display_Mode4(void)
     Refresh_Time++;
   } while (Refresh_Time < 15); // 强制刷新15次，避免出现卡顿现象
   Refresh_Time = 0;
-}
-
-/**
- * @brief 联网以更新天气数据
- */
-void weather_update(void)
-{
-  if (rtc.getMinute() % 30 == 0 && Update_Flag == 0)
-  {
-    // 重新连接WIFI
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-      digitalWrite(2, HIGH);
-      delay(500);
-      digitalWrite(2, LOW); // 闪烁表示正在连接
-      delay(500);
-    }
-    digitalWrite(2, LOW); // 熄灭表示连接成功
-    // UI显示
-    u8g2.clearDisplay();
-    u8g2.setFont(u8g2_font_wqy12_t_gb2312);
-    u8g2.setCursor(0, 12);
-    u8g2.printf("更新中...");
-    u8g2.sendBuffer();
-
-    // 创建HTTP对象
-    HTTPClient http;
-    http.begin(url + "?city=" + "420115" + "&key=" + key); // 访问指定URL
-    int httpCode = http.GET();                             // 接受HTTP相应状态码
-    String response = http.getString();                    // 获得相应正文
-    http.end();                                            // 关闭链接
-
-    // 关闭WIFI省电
-    WiFi.disconnect(true, false);
-    WiFi.mode(WIFI_OFF);
-
-    // UI显示
-    u8g2.setCursor(0, 24);
-    u8g2.printf("HTTP:%d", httpCode);
-    u8g2.sendBuffer();
-
-    // 转换JSON数据并更新
-    DynamicJsonDocument doc(1024);  // 初始化DynamicJsonDocument对象
-    deserializeJson(doc, response); // 解析JSON数据
-    temperature = doc["lives"][0]["temperature"].as<int>();
-    humidity = doc["lives"][0]["humidity"].as<int>();
-    windpower = doc["lives"][0]["windpower"].as<String>();
-    winddirection = doc["lives"][0]["winddirection"].as<String>();
-    province = doc["lives"][0]["province"].as<String>();
-    city = doc["lives"][0]["city"].as<String>();
-    weather = doc["lives"][0]["weather"].as<String>();
-    reporttime = doc["lives"][0]["reporttime"].as<String>();
-
-    // UI显示
-    u8g2.setCursor(0, 40);
-    u8g2.printf("更新成功！");
-    u8g2.setFont(u8g2_font_6x10_mf);
-    u8g2.setCursor(0, 64);
-    u8g2.printf("%s", reporttime.c_str());
-    u8g2.sendBuffer();
-    delay(2000);
-    u8g2.clearBuffer(); // 清除缓冲区避免残留影响主函数显示
-    Update_Flag = 1;
-  }
-  if (rtc.getMinute() % 30 != 0 && Update_Flag == 1)
-    Update_Flag = 0; // 避免反复触发
 }
 
 void Button_Scan(void)
@@ -622,4 +523,151 @@ void NUM_Display(int num, int x, int y, float change[], int W, int H)
   u8g2.drawVLine(x + W, y + 1, change[4]); // 右上竖线
   u8g2.drawVLine(x + 1, y + H, change[5]); // 左下竖线
   u8g2.drawVLine(x + W, y + H, change[6]); // 右下竖线
+}
+
+/**
+ * @brief WiFi连接程序
+ * @note code含义
+ *      WL_NO_SHIELD        = 255,    // 用于兼容WIFI屏蔽库
+ *      WL_IDLE_STATUS      = 0       //空闲状态
+ *      WL_NO_SSID_AVAIL    = 1       //未找到指定SSID
+ *      WL_SCAN_COMPLETED   = 2       //扫描完成
+ *      WL_CONNECTED        = 3       //连接成功
+ *      WL_CONNECT_FAILED   = 4       //连接失败
+ *      WL_CONNECTION_LOST  = 5       //连接丢失
+ *      WL_DISCONNECTED     = 6       //未连接
+ */
+// 声明结构体
+struct WIFI_Data
+{
+  const char *ssid; // 在出错时显示未定义
+  const char *password;
+};
+// 利用结构体来存储WiFi信息
+#define WIFI_NUM 3 // WiFi数量
+struct WIFI_Data MY_WIFI[WIFI_NUM] =
+    {
+        {"TP-LINK_6B14", "423.family.we.are"},
+        {"203", "203203203"},
+        {"sun", "00000000"}};
+
+int Save_ID = 0;
+void WIFI_Connect(void)
+{
+  int WIFI_Connect_Time = 0; // 记录WiFi连接次数
+  int WIFI_Connect_ID = 0;   // 记录WiFi连接对象的ID
+  Save_ID = EEPROM.read(5);
+  if (Save_ID < WIFI_NUM && Save_ID >= 0) // 判断EEPROM合法性
+  {
+    WIFI_Connect_ID = Save_ID;
+  }
+  while (1)
+  {
+    // 初始化WIFI
+    WiFi.begin(MY_WIFI[WIFI_Connect_ID].ssid, MY_WIFI[WIFI_Connect_ID].password);
+    for (uint8_t i = 0; i <= 4; i++)
+    {
+      // 显示连接UI
+      u8g2.clearBuffer();
+      u8g2.setCursor(0, 12);
+      u8g2.printf("连接中...");
+      u8g2.setCursor(0, 24);
+      u8g2.printf("SSID%d:%s", WIFI_Connect_ID + 1, MY_WIFI[WIFI_Connect_ID].ssid);
+      u8g2.setCursor(0, 36);
+      u8g2.printf("密码%d:%s", WIFI_Connect_ID + 1, MY_WIFI[WIFI_Connect_ID].password);
+      if (WiFi.status() != WL_CONNECTED)
+      {
+        digitalWrite(2, HIGH);
+        delay(150);
+        digitalWrite(2, LOW); // 闪烁表示正在连接
+        delay(150);
+        u8g2.setCursor(0, 48);
+        u8g2.printf("Code:%d", WiFi.status());
+        u8g2.sendBuffer();
+      }
+      else
+      {
+        digitalWrite(2, LOW);  // 熄灭表示连接成功
+        u8g2.setCursor(0, 48); // U8G2显示连接成功
+        u8g2.printf("网络连接成功");
+        u8g2.sendBuffer();
+        EEPROM.write(5, WIFI_Connect_ID); // 将WiFi连接ID写入EEPROM
+        EEPROM.commit();                  // 提交EEPROM写入
+        return;                           // 连接成功后跳出函数
+      }
+    }
+    // 连续5次连接失败则切换WiFi
+    WIFI_Connect_ID++; // 切换WiFi
+    if (WIFI_Connect_ID >= WIFI_NUM)
+      WIFI_Connect_ID = 0; // 当遍历完了全部ID后从0开始
+  }
+}
+
+/**
+ * @brief 联网以更新天气数据
+ */
+void weather_update(void)
+{
+
+  if (rtc.getMinute() % 30 == 0 && Update_Flag == 0)
+  {
+    // 重新连接WIFI
+    Save_ID = EEPROM.read(5);
+    WiFi.begin(MY_WIFI[Save_ID].ssid, MY_WIFI[Save_ID].password);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+      digitalWrite(2, HIGH);
+      delay(500);
+      digitalWrite(2, LOW); // 闪烁表示正在连接
+      delay(500);
+    }
+    digitalWrite(2, LOW); // 熄灭表示连接成功
+    // UI显示
+    u8g2.clearDisplay();
+    u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+    u8g2.setCursor(0, 12);
+    u8g2.printf("更新中...");
+    u8g2.sendBuffer();
+
+    // 创建HTTP对象
+    HTTPClient http;
+    http.begin(url + "?city=" + "420115" + "&key=" + key); // 访问指定URL
+    int httpCode = http.GET();                             // 接受HTTP相应状态码
+    String response = http.getString();                    // 获得相应正文
+    http.end();                                            // 关闭链接
+
+    // 关闭WIFI省电
+    WiFi.disconnect(true, false);
+    WiFi.mode(WIFI_OFF);
+
+    // UI显示
+    u8g2.setCursor(0, 24);
+    u8g2.printf("HTTP:%d", httpCode);
+    u8g2.sendBuffer();
+
+    // 转换JSON数据并更新
+    DynamicJsonDocument doc(1024);  // 初始化DynamicJsonDocument对象
+    deserializeJson(doc, response); // 解析JSON数据
+    temperature = doc["lives"][0]["temperature"].as<int>();
+    humidity = doc["lives"][0]["humidity"].as<int>();
+    windpower = doc["lives"][0]["windpower"].as<String>();
+    winddirection = doc["lives"][0]["winddirection"].as<String>();
+    province = doc["lives"][0]["province"].as<String>();
+    city = doc["lives"][0]["city"].as<String>();
+    weather = doc["lives"][0]["weather"].as<String>();
+    reporttime = doc["lives"][0]["reporttime"].as<String>();
+
+    // UI显示
+    u8g2.setCursor(0, 40);
+    u8g2.printf("更新成功！");
+    u8g2.setFont(u8g2_font_6x10_mf);
+    u8g2.setCursor(0, 64);
+    u8g2.printf("%s", reporttime.c_str());
+    u8g2.sendBuffer();
+    delay(2000);
+    u8g2.clearBuffer(); // 清除缓冲区避免残留影响主函数显示
+    Update_Flag = 1;
+  }
+  if (rtc.getMinute() % 30 != 0 && Update_Flag == 1)
+    Update_Flag = 0; // 避免反复触发
 }
