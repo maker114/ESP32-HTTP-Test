@@ -116,7 +116,7 @@ void loop()
   // OLED帧起始
 
   weather_update(0); // 天气更新
-  Button_Scan();    // 按键扫描
+  Button_Scan();     // 按键扫描
 
   if (rtc.getSecond() != LastSecond_Flag) // 1s刷新一次
   {
