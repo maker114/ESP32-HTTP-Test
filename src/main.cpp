@@ -115,7 +115,7 @@ void loop()
 {
   // OLED帧起始
 
-  weather_update(); // 天气更新
+  weather_update(0); // 天气更新
   Button_Scan();    // 按键扫描
 
   if (rtc.getSecond() != LastSecond_Flag) // 1s刷新一次
@@ -345,7 +345,23 @@ void Button_Scan(void)
       Button_Flag = 1; // 标志等于1表示被按下
     }
   }
-  else if (digitalRead(17) == HIGH && Button_Flag == 1)
+  if (digitalRead(16 == LOW))
+  {
+    digitalWrite(2, HIGH);
+    for (uint8_t i = 0; i < 20; i++)
+    {
+      if (digitalRead(16) == HIGH)
+      {
+        // 当提起抬手时退出按键检测
+        digitalWrite(2, LOW);
+        return;
+      }
+      delay(50); // 循环20次，约1秒
+    }
+    digitalWrite(2, LOW);
+    weather_update(1); // 长按按键2手动更新天气
+  }
+  if (digitalRead(17) == HIGH && Button_Flag == 1)
   {
     Button_Flag = 0; // 标志等于0表示未被按下
   }
@@ -610,10 +626,10 @@ void WIFI_Connect(void)
  * @brief 联网以更新天气数据
  */
 #define Interval 30 // 更新间隔（min）
-void weather_update(void)
+void weather_update(uint8_t mode_flag)
 {
   int Link_Time = 0; // 连接次数
-  if (rtc.getMinute() % Interval == 0 && Update_Flag == 0)
+  if ((rtc.getMinute() % Interval == 0 || mode_flag == 1) && Update_Flag == 0)
   {
     // 将之前的天气信息更新为“过时的”
     temperature = 0;
