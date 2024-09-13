@@ -45,6 +45,7 @@ void setup()
 {
   // 初始化IO
   pinMode(17, INPUT_PULLUP); // 控制按键
+  pinMode(16, INPUT_PULLUP); // 控制按键
   pinMode(2, OUTPUT);        // 控制LED
 
   // 初始化OLED
@@ -315,7 +316,7 @@ void Display_Mode4(void)
 
 void Button_Scan(void)
 {
-  if (digitalRead(17) == LOW && Button_Flag == 0)
+  if (digitalRead(17) == LOW && digitalRead(16) == LOW && Button_Flag == 0)
   {
     delay(20);
     if (digitalRead(17 == LOW) && Button_Flag == 0)
@@ -624,7 +625,7 @@ void weather_update(void)
     weather = "Dated";
     reporttime = "Dated";
     // 如果是模式3与4则不需要更新天气，直接返回
-    if (mode_flag == 3 || mode_flag == 4)
+    if (mode_flag == 2 || mode_flag == 3)
       return;
     // 重新连接WIFI
     Save_ID = EEPROM.read(5);
@@ -643,6 +644,9 @@ void weather_update(void)
         Update_Flag = 1;
         Link_Time = 0;
         Display_Mode4();
+        // 关闭WIFI省电
+        WiFi.disconnect(true, false);
+        WiFi.mode(WIFI_OFF);
         return;
       }
       Link_Time++;
