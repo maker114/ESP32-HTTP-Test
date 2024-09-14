@@ -316,7 +316,7 @@ void Display_Mode4(void)
 
 void Button_Scan(void)
 {
-  if (digitalRead(17) == LOW && digitalRead(16) == LOW && Button_Flag == 0)
+  if (digitalRead(17) == LOW && Button_Flag == 0)
   {
     delay(20);
     if (digitalRead(17 == LOW) && Button_Flag == 0)
@@ -345,6 +345,10 @@ void Button_Scan(void)
       Button_Flag = 1; // 标志等于1表示被按下
     }
   }
+  if (digitalRead(17) == HIGH && Button_Flag == 1)
+  {
+    Button_Flag = 0; // 标志等于0表示未被按下
+  }
   if (digitalRead(16 == LOW))
   {
     digitalWrite(2, HIGH);
@@ -360,10 +364,6 @@ void Button_Scan(void)
     }
     digitalWrite(2, LOW);
     weather_update(1); // 长按按键2手动更新天气
-  }
-  if (digitalRead(17) == HIGH && Button_Flag == 1)
-  {
-    Button_Flag = 0; // 标志等于0表示未被按下
   }
 }
 
