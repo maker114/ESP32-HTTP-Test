@@ -50,12 +50,8 @@ void setup()
 
   // 初始化OLED
   u8g2.begin();
-  u8g2.enableUTF8Print();                 // 开启中文字符支持
-  u8g2.setFont(u8g2_font_wqy12_t_gb2312); // 设置字体
-  u8g2.setCursor(0, 12);
-  u8g2.printf("连接中...");
-  u8g2.sendBuffer();
-
+  u8g2.enableUTF8Print(); // 开启中文字符支持
+  PowerOn_Animation();
   // 初始化串口
   // Serial.begin(9600);
   // Serial.println("Hello World!\r\n");
@@ -77,15 +73,10 @@ void setup()
   response2 = http.getString(); // 获取时间正文
   http.end();                   // 结束HTTP连接
 
-  u8g2.setCursor(0, 60); // 显示获取状态
-  if (httpCode1 == 200 && httpCode2 == 200)
-    u8g2.printf("时间与天气获取成功");
-  else
+  if (httpCode1 != 200 || httpCode2 != 200)
   {
-    u8g2.printf("时间与天气获取失败");
     HTTP_LinkError_Handle(); // 联网失败处理函数
   }
-  u8g2.sendBuffer();
 
   // 解析并转换JSON天气数据
   DynamicJsonDocument doc(1024);  // 初始化DynamicJsonDocument对象
@@ -104,9 +95,13 @@ void setup()
   deserializeJson(doc2, response2);        // 解析JSON数据，获取时间
   nowtime = doc2["data"]["now"].as<int>(); // 赋值
 
+  u8g2.setCursor(5, 60); // U8G2显示连接成功
+  u8g2.setFont(u8g2_font_new3x9pixelfont_tf);
+  u8g2.printf("Geting Data...");
+  u8g2.sendBuffer();
+
   // 初始化RTC时钟
   rtc.setTime(nowtime);
-  delay(2000);
   WiFi.disconnect(true, false);
   WiFi.mode(WIFI_OFF);
 }
@@ -388,6 +383,7 @@ void HTTP_LinkError_Handle(void)
     Link_Time++;                  // 记录重连次数
     // 重新连接获取UI
     u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_wqy12_t_gb2312); // 设置字体
     u8g2.setCursor(0, 12);
     u8g2.printf("重新获取数据中(%d)", Link_Time);
     u8g2.setCursor(0, 24);
@@ -575,11 +571,27 @@ void WIFI_Connect(void)
 {
   int WIFI_Connect_Time = 0; // 记录WiFi连接次数
   int WIFI_Connect_ID = 0;   // 记录WiFi连接对象的ID
+  float y_Data = 32;
   Save_ID = EEPROM.read(5);
   if (Save_ID < WIFI_NUM && Save_ID >= 0) // 判断EEPROM合法性
   {
     WIFI_Connect_ID = Save_ID;
   }
+  do
+  {
+    u8g2.clearBuffer();
+    u8g2.drawLine(5, y_Data + 15, 5, y_Data - 15);
+    u8g2.setFont(u8g2_font_10x20_t_arabic);
+    u8g2.setCursor(5 + 5, y_Data - 15 + 15);
+    u8g2.printf("ESP32 CLOCK");
+    u8g2.setFont(u8g2_font_profont12_mf);
+    u8g2.setCursor(5 + 6, y_Data + 13);
+    u8g2.printf("Design by Maker114");
+    Move_Cursor(20, &y_Data);
+    u8g2.sendBuffer();
+    delay(15);
+  } while (y_Data > 20);
+
   while (1)
   {
     // 初始化WIFI
@@ -588,27 +600,31 @@ void WIFI_Connect(void)
     {
       // 显示连接UI
       u8g2.clearBuffer();
-      u8g2.setCursor(0, 12);
-      u8g2.printf("连接中...");
-      u8g2.setCursor(0, 24);
-      u8g2.printf("SSID%d: %s", WIFI_Connect_ID + 1, MY_WIFI[WIFI_Connect_ID].ssid);
-      u8g2.setCursor(0, 36);
-      u8g2.printf("密码%d: %s", WIFI_Connect_ID + 1, MY_WIFI[WIFI_Connect_ID].password);
+      u8g2.drawLine(5, y_Data + 15, 5, y_Data - 15);
+      u8g2.setFont(u8g2_font_10x20_t_arabic);
+      u8g2.setCursor(5 + 5, y_Data - 15 + 15);
+      u8g2.printf("ESP32 CLOCK");
+      u8g2.setFont(u8g2_font_profont12_mf);
+      u8g2.setCursor(5 + 6, y_Data + 13);
+      u8g2.printf("Design by Maker114");
+
       if (WiFi.status() != WL_CONNECTED)
       {
         digitalWrite(2, HIGH);
         delay(150);
         digitalWrite(2, LOW); // 闪烁表示正在连接
         delay(150);
-        u8g2.setCursor(0, 48);
-        u8g2.printf("Code:%d", WiFi.status());
+        u8g2.setCursor(5, 60);
+        u8g2.setFont(u8g2_font_new3x9pixelfont_tf);
+        u8g2.printf("Searching WIFI...");
         u8g2.sendBuffer();
       }
       else
       {
         digitalWrite(2, LOW);  // 熄灭表示连接成功
-        u8g2.setCursor(0, 48); // U8G2显示连接成功
-        u8g2.printf("网络连接成功");
+        u8g2.setCursor(5, 60); // U8G2显示连接成功
+        u8g2.setFont(u8g2_font_new3x9pixelfont_tf);
+        u8g2.printf("Geting Data...");
         u8g2.sendBuffer();
         EEPROM.write(5, WIFI_Connect_ID); // 将WiFi连接ID写入EEPROM
         EEPROM.commit();                  // 提交EEPROM写入
@@ -716,4 +732,41 @@ void weather_update(uint8_t mode_flag)
   }
   if (rtc.getMinute() % Interval != 0 && Update_Flag == 1)
     Update_Flag = 0; // 避免反复触发
+}
+
+void PowerOn_Animation(void)
+{
+  int Refresh_Time = 0;
+  float y_data = 0;
+  float x_data = 64;
+  // 画线
+  do
+  {
+
+    u8g2.clearBuffer();
+    u8g2.drawLine(64, 32, 64, 32 + y_data);
+    u8g2.drawLine(64, 32, 64, 32 - y_data);
+    Move_Cursor(15, &y_data);
+    u8g2.sendBuffer();
+    delay(20);
+  } while (y_data < 15);
+  delay(200);
+  // 显示文字
+  do
+  {
+    u8g2.clearBuffer();
+    u8g2.setClipWindow(x_data - 1, 32 - 15, 128 - x_data + 1, 32 + 15);
+    u8g2.drawLine(x_data, 32 + 15, x_data, 32 - 15);
+    u8g2.setFont(u8g2_font_10x20_t_arabic);
+    u8g2.setCursor(x_data + 5, 32 - 15 + 15);
+    u8g2.printf("ESP32 CLOCK");
+    u8g2.setFont(u8g2_font_profont12_mf);
+    u8g2.setCursor(x_data + 6, 32 + 13);
+    u8g2.printf("Design by Maker114");
+    Move_Cursor(5, &x_data);
+    u8g2.sendBuffer();
+    delay(20);
+  } while (x_data > 5);
+  u8g2.setMaxClipWindow();
+  delay(500);
 }
