@@ -10,6 +10,7 @@ void HTTP_LinkError_Handle(void);
 void WIFI_Connect(void);
 void weather_update(uint8_t mode_flag);
 void PowerOn_Animation(void);
+void First_IN_Animation(void);
 void Move_Cursor(int GoalValue, float *CurrentValue);
 void NUM_Display(int num, int x, int y, float change[], int W, int H);
 

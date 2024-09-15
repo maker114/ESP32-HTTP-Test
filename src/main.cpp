@@ -104,6 +104,8 @@ void setup()
   rtc.setTime(nowtime);
   WiFi.disconnect(true, false);
   WiFi.mode(WIFI_OFF);
+
+  First_IN_Animation(); // 第一次进入动画
 }
 
 void loop()
@@ -141,63 +143,127 @@ void loop()
   delay(10);
 }
 
+enum TIME
+{
+  H1,
+  H2,
+  M1,
+  M2
+};
+uint8_t NOW_Time[4] = {0, 0, 0, 0};
+uint8_t LAST_Time[4] = {0, 0, 0, 0};
+float X_Data_H1 = 0;
+float X_Data_H2 = 0;
+float X_Data_M1 = 0;
+float X_Data_M2 = 0;
 void Display_Mode1(void)
 {
   /*===========================================*/
   // 模式一，正常时间显示界面
   /*===========================================*/
+  // 时间赋值
+  NOW_Time[H1] = rtc.getHour() / 10;
+  NOW_Time[H2] = rtc.getHour() % 10;
+  NOW_Time[M1] = rtc.getMinute() / 10;
+  NOW_Time[M2] = rtc.getMinute() % 10;
+  // 判断是否需要刷新、
   u8g2.setFont(u8g2_font_logisoso32_tn);
-  u8g2.setCursor(0, 32);
-  // 小时
-  if (rtc.getHour() < 10)
-    u8g2.printf("0%d", rtc.getHour());
-  else
-    u8g2.printf("%d", rtc.getHour());
-  // 分隔
-  u8g2.printf(":");
-  // 分钟
-  if (rtc.getMinute() < 10)
-    u8g2.printf("0%d", rtc.getMinute());
-  else
-    u8g2.printf("%d", rtc.getMinute());
-  // 秒
-  u8g2.setFont(u8g2_font_logisoso16_tn);
-  u8g2.setCursor(100, 16);
 
-  if (rtc.getSecond() < 10)
-    u8g2.printf("0%d", rtc.getSecond());
-  else
-    u8g2.printf("%d", rtc.getSecond());
-  // AM/PM
-  u8g2.setFont(u8g2_font_profont22_tr);
-  u8g2.setCursor(100, 32);
-  String nowtime = rtc.getAmPm();
-  char *c = (char *)nowtime.c_str();
-  u8g2.printf("%s", c);
-  u8g2.drawHLine(0, 36, 128);
-  u8g2.setFont(u8g2_font_wqy12_t_gb2312);
-  u8g2.setCursor(0, 48);
-  u8g2.printf("天气： %s %d℃", weather, temperature);
-  u8g2.setCursor(0, 62);
-  u8g2.printf("风力： %s %s级", winddirection, windpower);
-  // 显示天气图标
-  u8g2.setCursor(110, 48);
-  u8g2.setFontMode(0);
-  u8g2.setFont(u8g2_font_open_iconic_weather_2x_t);
-  if (weather == "晴" && rtc.getHour(true) > 6 && rtc.getHour(true) <= 17) // 上午7点到下午5点为白天
-    u8g2.drawGlyph(105, 58, 0x45);
-  else if (weather == "晴" && rtc.getHour(true) > 17 && rtc.getHour(true) <= 6) // 下午6点到第二天6点为晚上
-    u8g2.drawGlyph(105, 58, 0x42);
-  else if (weather == "阴")
-    u8g2.drawGlyph(105, 58, 0x41);
-  else if (weather == "多云")
-    u8g2.drawGlyph(105, 58, 0x40);
-  else if (weather == "小雨" || weather == "中雨" || weather == "大雨" || weather == "暴雨" || weather == "雨" || weather == "阵雨")
-    u8g2.drawGlyph(105, 58, 0x43);
-  // 未知的天气将不会显示图标
-  // else
-  //   u8g2.drawGlyph(105, 58, 0x40);
-  u8g2.sendBuffer();
+  if (NOW_Time[M2] != LAST_Time[M2])
+  {
+    X_Data_M2 = 0;
+  }
+  if (NOW_Time[M1] != LAST_Time[M1])
+  {
+    X_Data_M1 = 0;
+  }
+  if (NOW_Time[H2] != LAST_Time[H2])
+  {
+    X_Data_H2 = 0;
+  }
+  if (NOW_Time[H1] != LAST_Time[H1])
+  {
+    X_Data_H1 = 0;
+  }
+  do
+  {
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_logisoso32_tn);
+
+    Move_Cursor(32, &X_Data_M2);
+    u8g2.setCursor(u8g2.getStrWidth("00:0"), X_Data_M2);
+    u8g2.printf("%d", NOW_Time[M2]);
+    u8g2.setCursor(u8g2.getStrWidth("00:0"), X_Data_M2 + 33);
+    u8g2.printf("%d", LAST_Time[M2]);
+
+    if (X_Data_M2 == 32)
+      Move_Cursor(32, &X_Data_M1);
+    u8g2.setCursor(u8g2.getStrWidth("00:"), X_Data_M1);
+    u8g2.printf("%d", NOW_Time[M1]);
+    u8g2.setCursor(u8g2.getStrWidth("00:"), X_Data_M1 + 33);
+    u8g2.printf("%d", LAST_Time[M1]);
+
+    if (X_Data_M1 == 32)
+      Move_Cursor(32, &X_Data_H2);
+    u8g2.setCursor(u8g2.getStrWidth("0"), X_Data_H2);
+    u8g2.printf("%d", NOW_Time[H2]);
+    u8g2.setCursor(u8g2.getStrWidth("0"), X_Data_H2 + 33);
+    u8g2.printf("%d", LAST_Time[H2]);
+
+    if (X_Data_H2 == 32)
+      Move_Cursor(32, &X_Data_H1);
+    u8g2.setCursor(0, X_Data_H1);
+    u8g2.printf("%d", NOW_Time[H1]);
+    u8g2.setCursor(0, X_Data_H1 + 33);
+    u8g2.printf("%d", LAST_Time[H1]);
+
+    u8g2.setCursor(u8g2.getStrWidth("00"), 32);
+    u8g2.printf(":");
+
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(0, 32, 128, 33);
+    u8g2.setDrawColor(1);
+
+    //  秒
+    u8g2.setFont(u8g2_font_logisoso16_tn);
+    u8g2.setCursor(100, 16);
+    if (rtc.getSecond() < 10)
+      u8g2.printf("0%d", rtc.getSecond());
+    else
+      u8g2.printf("%d", rtc.getSecond());
+    // AM/PM
+    u8g2.setFont(u8g2_font_profont22_tr);
+    u8g2.setCursor(100, 32);
+    String nowtime = rtc.getAmPm();
+    char *c = (char *)nowtime.c_str();
+    u8g2.printf("%s", c);
+    u8g2.drawHLine(0, 36, 128);
+    u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+    u8g2.setCursor(0, 48);
+    u8g2.printf("天气： %s %d℃", weather, temperature);
+    u8g2.setCursor(0, 62);
+    u8g2.printf("风力： %s %s级", winddirection, windpower);
+    // 显示天气图标
+    u8g2.setCursor(110, 48);
+    u8g2.setFontMode(0);
+    u8g2.setFont(u8g2_font_open_iconic_weather_2x_t);
+    if (weather == "晴" && rtc.getHour(true) > 6 && rtc.getHour(true) <= 17) // 上午7点到下午5点为白天
+      u8g2.drawGlyph(105, 58, 0x45);
+    else if (weather == "晴" && rtc.getHour(true) > 17 && rtc.getHour(true) <= 6) // 下午6点到第二天6点为晚上
+      u8g2.drawGlyph(105, 58, 0x42);
+    else if (weather == "阴")
+      u8g2.drawGlyph(105, 58, 0x41);
+    else if (weather == "多云")
+      u8g2.drawGlyph(105, 58, 0x40);
+    else if (weather == "小雨" || weather == "中雨" || weather == "大雨" || weather == "暴雨" || weather == "雨" || weather == "阵雨")
+      u8g2.drawGlyph(105, 58, 0x43); // 未知的天气将不会显示图标
+    u8g2.sendBuffer();
+    delay(10);
+  } while (X_Data_H1 < 32 || X_Data_H2 < 32 || X_Data_M1 < 32 || X_Data_M2 < 32);
+  LAST_Time[H2] = NOW_Time[H2];
+  LAST_Time[H1] = NOW_Time[H1];
+  LAST_Time[M1] = NOW_Time[M1];
+  LAST_Time[M2] = NOW_Time[M2];
 }
 
 void Display_Mode2(void)
@@ -645,7 +711,7 @@ void WIFI_Connect(void)
 void weather_update(uint8_t mode_flag)
 {
   int Link_Time = 0; // 连接次数
-  if ((rtc.getMinute() % Interval == 0 || mode_flag == 1) && Update_Flag == 0)
+  if ((rtc.getMinute() % Interval == 0 && Update_Flag == 0) || mode_flag == 1)
   {
     // 将之前的天气信息更新为“过时的”
     temperature = 0;
@@ -768,5 +834,87 @@ void PowerOn_Animation(void)
     delay(20);
   } while (x_data > 5);
   u8g2.setMaxClipWindow();
-  delay(500);
+  delay(200);
+}
+
+void First_IN_Animation(void)
+{
+  float x_data1 = 5;
+  float x_data2 = 5;
+  float y_data1 = 5;
+  float y_data2 = 35;
+  float y_data3 = 20;
+  float y_data4 = 33;
+  do
+  {
+    u8g2.clearBuffer();
+    Move_Cursor(128, &x_data1);
+    Move_Cursor(36, &y_data1);
+    Move_Cursor(0, &x_data2);
+    Move_Cursor(36, &y_data2);
+
+    Move_Cursor(0, &y_data3);
+    Move_Cursor(0, &y_data4);
+
+    u8g2.setFont(u8g2_font_10x20_t_arabic);
+    u8g2.setCursor(5 + 5, y_data3);
+    u8g2.printf("ESP32 CLOCK");
+    u8g2.setFont(u8g2_font_profont12_mf);
+    u8g2.setCursor(5 + 6, y_data4);
+    u8g2.printf("Design by Maker114");
+
+    u8g2.setDrawColor(0);
+    u8g2.drawBox(0, 0, 128, 2);
+    u8g2.setDrawColor(1);
+
+    u8g2.drawLine(x_data1, y_data1, x_data2, y_data2);
+    u8g2.sendBuffer();
+    delay(15);
+  } while (x_data1 < 128 || y_data1 < 36 || x_data2 > 0 || y_data2 < 36 || y_data3 > 0 || y_data4 > 0);
+
+  float x_data3 = 128;
+  do
+  {
+    Move_Cursor(0, &x_data3);
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_logisoso32_tn);
+    u8g2.setCursor(x_data3, 33);
+    u8g2.printf("00:00");
+    u8g2.setFont(u8g2_font_logisoso16_tn);
+    u8g2.setCursor(x_data3 + 100, 16);
+    if (rtc.getSecond() < 10)
+      u8g2.printf("0%d", rtc.getSecond());
+    else
+      u8g2.printf("%d", rtc.getSecond());
+
+    u8g2.setFont(u8g2_font_profont22_tr);
+    u8g2.setCursor(x_data3 + 100, 32);
+    String nowtime = rtc.getAmPm();
+    char *c = (char *)nowtime.c_str();
+    u8g2.printf("%s", c);
+
+    u8g2.drawHLine(0, 36, 128);
+
+    u8g2.setFont(u8g2_font_wqy12_t_gb2312);
+    u8g2.setCursor(x_data3 + 0, 48);
+    u8g2.printf("天气： %s %d℃", weather, temperature);
+    u8g2.setCursor(x_data3 + 0, 62);
+    u8g2.printf("风力： %s %s级", winddirection, windpower);
+    u8g2.setCursor(x_data3 + 110, 48);
+    u8g2.setFontMode(0);
+    u8g2.setFont(u8g2_font_open_iconic_weather_2x_t);
+    if (weather == "晴" && rtc.getHour(true) > 6 && rtc.getHour(true) <= 17) // 上午7点到下午5点为白天
+      u8g2.drawGlyph(x_data3 + 105, 58, 0x45);
+    else if (weather == "晴" && rtc.getHour(true) > 17 && rtc.getHour(true) <= 6) // 下午6点到第二天6点为晚上
+      u8g2.drawGlyph(x_data3 + 105, 58, 0x42);
+    else if (weather == "阴")
+      u8g2.drawGlyph(x_data3 + 105, 58, 0x41);
+    else if (weather == "多云")
+      u8g2.drawGlyph(x_data3 + 105, 58, 0x40);
+    else if (weather == "小雨" || weather == "中雨" || weather == "大雨" || weather == "暴雨" || weather == "雨" || weather == "阵雨")
+      u8g2.drawGlyph(x_data3 + 105, 58, 0x43); // 未知的天气将不会显示图标
+
+    u8g2.sendBuffer();
+    delay(20);
+  } while (x_data3 > 0);
 }
