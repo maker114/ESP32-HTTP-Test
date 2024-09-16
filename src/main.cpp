@@ -221,7 +221,7 @@ void Display_Mode1(void)
     u8g2.printf(":");
 
     u8g2.setDrawColor(0);
-    u8g2.drawBox(0, 32, 128, 33);
+    u8g2.drawBox(0, 33, 128, 33);
     u8g2.setDrawColor(1);
 
     //  秒
