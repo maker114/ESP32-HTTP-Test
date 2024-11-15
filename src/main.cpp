@@ -249,14 +249,17 @@ void Display_Mode1(void)
     u8g2.setFont(u8g2_font_open_iconic_weather_2x_t);
     if (weather == "晴" && rtc.getHour(true) > 6 && rtc.getHour(true) <= 17) // 上午7点到下午5点为白天
       u8g2.drawGlyph(105, 58, 0x45);
-    else if (weather == "晴" && rtc.getHour(true) > 17 && rtc.getHour(true) <= 6) // 下午6点到第二天6点为晚上
+    if (weather == "晴" && (rtc.getHour(true) > 17 || rtc.getHour(true) <= 6)) // 下午6点到第二天6点为晚上
       u8g2.drawGlyph(105, 58, 0x42);
     else if (weather == "阴")
       u8g2.drawGlyph(105, 58, 0x41);
     else if (weather == "多云")
       u8g2.drawGlyph(105, 58, 0x40);
     else if (weather == "小雨" || weather == "中雨" || weather == "大雨" || weather == "暴雨" || weather == "雨" || weather == "阵雨")
-      u8g2.drawGlyph(105, 58, 0x43); // 未知的天气将不会显示图标
+      u8g2.drawGlyph(105, 58, 0x43);
+    else
+      u8g2.drawGlyph(105, 58, 0x40);
+    // 未知的天气将不会显示图标
     u8g2.sendBuffer();
     delay(10);
   } while (X_Data_H1 < 32 || X_Data_H2 < 32 || X_Data_M1 < 32 || X_Data_M2 < 32);
@@ -710,8 +713,8 @@ void WIFI_Connect(void)
 #define Interval 30 // 更新间隔（min）
 void weather_update(uint8_t mode_flag)
 {
-  int Link_Time = 0; // 连接次数
-  if ((rtc.getMinute() % Interval == 0 && Update_Flag == 0) || mode_flag == 1)
+  int Link_Time = 0;                                                           // 连接次数
+  if ((rtc.getMinute() % Interval == 0 && Update_Flag == 0) && mode_flag == 1) // 仅模式一更新天气
   {
     // 将之前的天气信息更新为“过时的”
     temperature = 0;
@@ -879,7 +882,11 @@ void First_IN_Animation(void)
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_logisoso32_tn);
     u8g2.setCursor(x_data3, 33);
-    u8g2.printf("00:00");
+    u8g2.printf("00:");
+    u8g2.setCursor(x_data3 + u8g2.getStrWidth("00"), 32);
+    u8g2.printf(":");
+    u8g2.setCursor(x_data3 + u8g2.getStrWidth("00:"), 33);
+    u8g2.printf("00");
     u8g2.setFont(u8g2_font_logisoso16_tn);
     u8g2.setCursor(x_data3 + 100, 16);
     if (rtc.getSecond() < 10)
@@ -917,4 +924,5 @@ void First_IN_Animation(void)
     u8g2.sendBuffer();
     delay(20);
   } while (x_data3 > 0);
+  delay(10);
 }
