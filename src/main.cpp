@@ -59,7 +59,8 @@ void setup()
   // 初始化内部EEPROM
   EEPROM.begin(12);
 
-  WIFI_Connect(); // 连接WiFi
+  // 连接WiFi
+  WIFI_Connect();
 
   // 初始化HTTP连接，联网以获取JSON文件
   HTTPClient http;                                    // 创建HTTP对象
@@ -105,13 +106,13 @@ void setup()
   WiFi.disconnect(true, false);
   WiFi.mode(WIFI_OFF);
 
-  First_IN_Animation(); // 第一次进入动画
+  // 第一次进入动画
+  First_IN_Animation();
 }
 
 void loop()
 {
   // OLED帧起始
-
   weather_update(0); // 天气更新
   Button_Scan();     // 按键扫描
 
@@ -156,11 +157,12 @@ float X_Data_H1 = 0;
 float X_Data_H2 = 0;
 float X_Data_M1 = 0;
 float X_Data_M2 = 0;
+/**
+ * @brief 模式一：含有天气的正常时间显示界面
+ *
+ */
 void Display_Mode1(void)
 {
-  /*===========================================*/
-  // 模式一，正常时间显示界面
-  /*===========================================*/
   // 时间赋值
   NOW_Time[H1] = rtc.getHour() / 10;
   NOW_Time[H2] = rtc.getHour() % 10;
@@ -259,7 +261,6 @@ void Display_Mode1(void)
       u8g2.drawGlyph(105, 58, 0x43);
     else
       u8g2.drawGlyph(105, 58, 0x40);
-    // 未知的天气将不会显示图标
     u8g2.sendBuffer();
     delay(10);
   } while (X_Data_H1 < 32 || X_Data_H2 < 32 || X_Data_M1 < 32 || X_Data_M2 < 32);
@@ -269,11 +270,12 @@ void Display_Mode1(void)
   LAST_Time[M2] = NOW_Time[M2];
 }
 
+/**
+ * @brief 模式二：详细天气显示界面
+ *
+ */
 void Display_Mode2(void)
 {
-  /*===========================================*/
-  // 模式二，详细天气显示界面
-  /*===========================================*/
   u8g2.setFont(u8g2_font_wqy12_t_gb2312);
   u8g2.setCursor(0, 12);
   u8g2.printf("天气： %s %d℃", weather, temperature);
@@ -319,11 +321,12 @@ float change_S2[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 int num1 = 0;
 int num2 = 0;
+/**
+ * @brief 模式三：省电时钟界面
+ *
+ */
 void Display_Mode3(void)
 {
-  /*===========================================*/
-  // 模式三，简单时钟界面
-  /*===========================================*/
   u8g2.clearBuffer(); // 清空缓冲区
   u8g2.setFont(u8g2_font_maniac_tn);
   u8g2.setCursor(30, 42);
@@ -343,11 +346,13 @@ void Display_Mode3(void)
 }
 
 int Refresh_Time = 0;
+
+/**
+ * @brief 模式四：丝滑数字显示界面
+ *
+ */
 void Display_Mode4(void)
 {
-  /*===========================================*/
-  // 模式四，带有秒针简单时钟界面
-  /*===========================================*/
   int Hour = rtc.getHour(true);
   int Minute = rtc.getMinute();
   int Second = rtc.getSecond();
@@ -431,6 +436,10 @@ void Button_Scan(void)
   }
 }
 
+/**
+ * @brief 连接失败重试程序
+ *
+ */
 void HTTP_LinkError_Handle(void)
 {
   int Link_Time = 0; // 记录重连次数
@@ -468,6 +477,13 @@ void HTTP_LinkError_Handle(void)
   delay(1000);
 }
 
+/**
+ * @brief 数字平滑移动
+ *
+ * @param GoalValue 目标值
+ * @param CurrentValue 待更改的当前值
+ * @note 函数不作延时，需要在每一帧的后面独立按照需求延时
+ */
 void Move_Cursor(int GoalValue, float *CurrentValue)
 {
   float Error = GoalValue - *CurrentValue; // 误差等于目标值减去实际值
@@ -480,6 +496,16 @@ void Move_Cursor(int GoalValue, float *CurrentValue)
   // delay(1);
 }
 
+/**
+ * @brief 丝滑数字显示函数
+ *
+ * @param num 待显示的数字
+ * @param x 数字的x坐标
+ * @param y 数字的y坐标
+ * @param change 数字对应的数组
+ * @param W 数字的宽度
+ * @param H 数字的高度
+ */
 void NUM_Display(int num, int x, int y, float change[], int W, int H)
 {
   int Goal_Value[7] = {0, 0, 0, 0, 0, 0, 0}; // 目标数组
@@ -803,6 +829,10 @@ void weather_update(uint8_t mode_flag)
     Update_Flag = 0; // 避免反复触发
 }
 
+/**
+ * @brief 开机动画
+ *
+ */
 void PowerOn_Animation(void)
 {
   int Refresh_Time = 0;
@@ -840,6 +870,10 @@ void PowerOn_Animation(void)
   delay(200);
 }
 
+/**
+ * @brief 第一次进入的动画
+ *
+ */
 void First_IN_Animation(void)
 {
   float x_data1 = 5;
